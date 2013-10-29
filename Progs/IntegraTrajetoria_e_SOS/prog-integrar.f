@@ -21,19 +21,20 @@ c     Parametros fisicos
       rP2=1738.0d0/dpri
 
 c     Atribuindo o valor da Constante de Jacobi
-      write(*,*) 'Entre com c0'
+      write(*,*)'Entre com c0'
       read(*,*) C0
 
 c     Definindo a linha de cis e setando tempo final de integracao
       cont=1
-      x1_ini=rmu-1.0d0-rP2; x1_fim=rmu-1.0d0+rP2
+      x1_ini=rmu-1.0d0-(rP2+0.0001); x1_fim=rmu-1.0d0+(rP2+0.0001)
       x1_step=abs(x1_fim-x1_ini)/1.0d1
       ci(1)=x1_ini; tf=50.0d0; sentido=-1.0d0 ! Integracao direta (+1.0d0) ou retrograda (-1.0d0)
 
       do while (ci(1).le.x1_fim)
          write(*,*)'cont,ci:',cont,ci(1)
          write(3,*)cont;
-         ci(2)=dsqrt(rP2**2.0d0-(ci(1)-(rmu-1.0d0))**2.0d0); ci(3)=0.0d0
+         ci(2)=dsqrt((rP2+0.0001)**2.0d0-(ci(1)-(rmu-1.0d0))**2.0d0)
+         ci(3)=0.0d0
          call Vely (rmu,ndim,ci,C0,kvel)
          if(kvel.ne.0)then; write(*,*)'vy**2<0!'; goto 2; endif
          ci(4)=-ci(4)
@@ -61,7 +62,7 @@ c=======================================================================
       do while (kopcao.le.1)
          if(kopcao.eq.0)then
             call evoluinorm (rmu,ndim,tf,t,told,y,yold,dt,
-     &           nfuros,kopcao)
+     &           nfuros,kopcao,sentido)
          else if (kopcao.eq.1) then ! integra com regularizacao
             call evoluiregu (rmu,ndim,tf,t,told,y,yold,dt,
      &           nfuros,kopcao)
@@ -143,13 +144,13 @@ c=======================================================================
 
 c=======================================================================
       subroutine evoluinorm (rmu,ndim,tfim,time,told,y,yold,dt,
-     &           nfuros,kopcao)
+     &           nfuros,kopcao,sentido)
 c=======================================================================
       implicit real*8 (A-H,O-Z)
       dimension y(ndim),yold(ndim)
-      dimension relerr(ndim),abserr(ndim),work(56) ! no minimo 14*neq
+      dimension relerr(ndim),abserr(ndim),work(56) ! no minimo 14*ndim
       external deriv
-      do i=1,neq; relerr(i)=1.0D-14; abserr(i)=1.0D-15; enddo
+      do i=1,ndim; relerr(i)=1.0D-14; abserr(i)=1.0D-15; enddo
       iflag=1; tout=time+dt; dtmax=0.1d0
 c-----
       do while (dabs(time).le.dabs(tfim).and.kopcao.eq.0)
@@ -163,8 +164,12 @@ c-----
             tout=tout+dtmax; endif
             if(dabs(tout).gt.dabs(tfim))then
                if(dabs(time).lt.dabs(tfim))then
-               tout=tfim; else; kopcao=3
-            return; endif; endif
+                  tout=tfim*sentido
+               else
+                  kopcao=3
+                  return
+               endif
+            endif
          endif
          call testar (rmu,ndim,told,time,yold,y,nfuros,kopcao)
       enddo
